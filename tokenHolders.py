@@ -16,6 +16,8 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 """
+Get Ethereum ERC20 Transfer Event Logs with Infura
+
 Example invocation:
     INFURA_API_KEY=<Your-Infura-Key> python3 tokenHolders.py -d 18 -t ERC20-Contract-Address > transfers.json
 """
@@ -73,6 +75,7 @@ def getBalances(transfers: list, toBlock=None, cutoff=None) -> list:
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(prog='tokenHolders.py', formatter_class=argparse.RawTextHelpFormatter,
+            description='Requires the environment variable INFURA_API_KEY to be set.',
             epilog='e.g. INFURA_API_KEY=<Your-Infura-Key> ./tokenHolders.py 0x9f8f72aa9304c8b593d555f12ef6589cc3a579a2 > MKR_bal.json')
     parser.add_argument('contract', help='ERC20 contract address', type=str)
     parser.add_argument('-d', '--decimals', help='ERC20 contract decimals (default 18)', default=18, type=int)
