@@ -1,14 +1,12 @@
-# tokenHolders
+# tokenHolders.py
 
 Get Ethereum ERC20 Transfer Event Logs with Infura, graph basic ownership stats.
 
-[graph](https://github.com/devenoges/tokenHolders/raw/master/MKR_Holders_and_Gini_Index_for_MKR_and_MKR_OLD.png "MKR Holders and Gini Index for MKR and MKR_OLD")
+![graph](https://github.com/devenoges/tokenHolders/raw/master/MKR_Holders_and_Gini_Index_for_MKR_and_MKR_OLD.png "MKR Holders and Gini Index for MKR and MKR_OLD")
 
-[graph](https://raw.githubusercontent.com/devenoges/tokenHolders/master/MKR_Holders_and_Gini_Index_for_MKR_and_MKR_OLD.png "Gini Index for MKR and MKR_OLD")
 
-[graph](https://github.com/devenoges/tokenHolders/raw/master/MKR_Holders_and_Gini_Index_for_MKR_only.png "MKR Holders and Gini Index for MKR only")
+![graph](https://github.com/devenoges/tokenHolders/raw/master/MKR_Holders_and_Gini_Index_for_MKR_only.png "MKR Holders and Gini Index for MKR only")
 
-[graph](https://raw.githubusercontent.com/devenoges/tokenHolders/master/MKR_Holders_and_Gini_Index_for_MKR_only.png "Gini Index for MKR only")
 
 ## Installation
 
