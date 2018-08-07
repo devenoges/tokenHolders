@@ -18,8 +18,23 @@
 """
 Get Ethereum ERC20 Transfer Event Logs with Infura
 
-Example invocation:
+Example invocations:
     INFURA_API_KEY=<Your-Infura-Key> python3 tokenHolders.py -d 18 -t ERC20-Contract-Address > transfers.json
+
+    tokenHolders.py -d 8 -t 0x168296bb09e24a88805cb9c33356536b980d3fc5 > tx.RHOC.0x168296bb09e24a88805cb9c33356536b980d3fc5.json
+    tokenHolders.py -d 9 -t 0xe0b7927c4af23765cb51314a0e0521a9645f0e2a > tx.DGD.0xe0b7927c4af23765cb51314a0e0521a9645f0e2a.json
+    tokenHolders.py -d 9 -t 0x4f3afec4e5a3f2a6a1a411def7d7dfe50ee057bf > tx.DGX.0x4f3afec4e5a3f2a6a1a411def7d7dfe50ee057bf.json
+    tokenHolders.py -t 0xB8c77482e45F1F44dE1745F52C74426C631bDD52  > tx.BNB.0xB8c77482e45F1F44dE1745F52C74426C631bDD52.json
+
+    tokenHolders.py -t 0x89d24a6b4ccb1b6faa2625fe562bdd9a23260359  > tx.DAI.0x89d24a6b4ccb1b6faa2625fe562bdd9a23260359.json
+
+    tokenHolders.py -t 0x8dd5fbce2f6a956c3022ba3663759011dd51e73e  > tx.TUSD.0x8dd5fbce2f6a956c3022ba3663759011dd51e73e.json
+
+    tokenHolders.py -t 0xd26114cd6EE289AccF82350c8d8487fedB8A0C07  > tx.OMG.0xd26114cd6EE289AccF82350c8d8487fedB8A0C07.json
+
+
+TODO:
+    add csv output option
 """
 
 import argparse, os, sys
@@ -28,20 +43,81 @@ from decimal import Decimal
 
 import requests
 import simplejson as json
+import numpy as np
 
-INFURA_KEY = os.environ.get("INFURA_KEY")
+INFURA_API_KEY = os.environ['INFURA_API_KEY']
 
 ERC20_TRANSFER_EVENT_TOPIC_HASH = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
 
+def gini(array, filterZero=False):
+    """
+    Calculate the Gini coefficient of a numpy array.
+
+    All values are treated equally, arrays must be 1d.
+
+    see:
+        http://neuroplausible.com/gini
+        https://github.com/oliviaguest/gini (CC0 licence)
+    based on bottom eq:
+        http://www.statsdirect.com/help/generatedimages/equations/equation154.svg
+    from:
+        http://www.statsdirect.com/help/default.htm#nonparametric_methods/gini.htm
+    """
+    array = array.flatten()
+    if np.amin(array) < 0:
+        # Values cannot be negative:
+        array -= np.amin(array)
+    # Values cannot be 0:
+    if filterZero:
+        array = (array != Decimal('0'))
+    # Values must be sorted:
+    array = np.sort(array)
+    # Index per array element:
+    index = np.arange(1, array.shape[0]+1)
+    # Number of array elements:
+    n = array.shape[0]
+    # Gini coefficient:
+    return ((np.sum((2 * index - n - 1) * array)) / (n * np.sum(array)))
+
 def callInfura(method: str, params: dict) -> dict:
     data = {'jsonrpc': '2.0', 'method': method, 'params': params, 'id': 1}
-    response = requests.post(f'https://mainnet.infura.io/{INFURA_KEY}', headers={'Content-Type': 'application/json'}, json=data)
-    print(f'Got infura response {response}', file=sys.stderr)
+    response = requests.post(f'https://mainnet.infura.io/{INFURA_API_KEY}', headers={'Content-Type': 'application/json'}, json=data)
+    print(f'Infura response {response}', file=sys.stderr)
+    response.raise_for_status()
     return response.json()
 
-def getTransferEventLogs(address: str, decimals: int, fromBlock='earliest', toBlock='latest') -> list:
-    logs = callInfura('eth_getLogs',
-            [{'address': address, 'fromBlock': fromBlock, 'toBlock': toBlock, 'topics': [ERC20_TRANSFER_EVENT_TOPIC_HASH]}])['result']
+def getTransferEventLogs(address: str, decimals: int, fromBlock='earliest', toBlock='latest', useChunking=True, chunkSize=50000) -> list:
+    """
+    TODO:
+        check block range step
+        write logs as they are receved
+        resume partial log download
+    """
+    if useChunking:
+        logs = []
+        firstLogBlock = 1
+        lastLogBlock = int(callInfura('eth_blockNumber', [{}])['result'], 16)
+        print(f'1st: {firstLogBlock} last: {lastLogBlock}', file=sys.stderr)
+        logs = []
+        for block in range(firstLogBlock, lastLogBlock, chunkSize):
+            attempts = 0
+            while attempts <= 3:
+                try:
+                    log = callInfura('eth_getLogs',
+                            [{'address': address, 'fromBlock': hex(block), 'toBlock': hex(block + chunkSize), 'topics': [ERC20_TRANSFER_EVENT_TOPIC_HASH]}])['result']
+                    logs += log
+                    print(f'{len(log)} logs for range {block} to {block + chunkSize}', file=sys.stderr)
+                    break
+                except requests.exceptions.RequestException as ex:
+                    attempts += 1
+                    if attempts > 3:
+                        raise ex
+                    else:
+                        print (f'Error getting logs from Infura {ex}, retrying', file=sys.stderr)
+    else:
+        logs = callInfura('eth_getLogs',
+                [{'address': address, 'fromBlock': fromBlock, 'toBlock': toBlock, 'topics': [ERC20_TRANSFER_EVENT_TOPIC_HASH]}])['result']
+
     decimalFactor = Decimal('10') ** Decimal(f'-{decimals}')
     print(f'Processing {len(logs)} transfer events', file=sys.stderr)
     for log in logs:
@@ -79,10 +155,11 @@ if __name__ == '__main__':
             epilog='e.g. INFURA_API_KEY=<Your-Infura-Key> ./tokenHolders.py 0x9f8f72aa9304c8b593d555f12ef6589cc3a579a2 > MKR_bal.json')
     parser.add_argument('contract', help='ERC20 contract address', type=str)
     parser.add_argument('-d', '--decimals', help='ERC20 contract decimals (default 18)', default=18, type=int)
+    parser.add_argument('-c', '--chunk-size', help='Number of blocks per eth_getLogs request (default 50000)', default=50000, type=int)
     parser.add_argument('-t', '--transfers', help='Print transfer events (default print address balances)', default=False, action='store_true')
     arguments = parser.parse_args()
 
-    tx = getTransferEventLogs(arguments.contract, arguments.decimals)
+    tx = getTransferEventLogs(arguments.contract, arguments.decimals, chunkSize=arguments.chunk_size)
     if arguments.transfers:
         print(json.dumps(tx, indent=4))
     else:

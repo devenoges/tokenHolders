@@ -25,36 +25,6 @@ import matplotlib.pyplot as plt
 
 import tokenHolders
 
-def gini(array, filterZero=False):
-    """
-    Calculate the Gini coefficient of a numpy array.
-
-    All values are treated equally, arrays must be 1d.
-
-    see:
-        http://neuroplausible.com/gini
-        https://github.com/oliviaguest/gini (CC0 licence)
-    based on bottom eq:
-        http://www.statsdirect.com/help/generatedimages/equations/equation154.svg
-    from:
-        http://www.statsdirect.com/help/default.htm#nonparametric_methods/gini.htm
-    """
-    array = array.flatten()
-    if np.amin(array) < 0:
-        # Values cannot be negative:
-        array -= np.amin(array)
-    # Values cannot be 0:
-    if filterZero:
-        array = (array != Decimal('0'))
-    # Values must be sorted:
-    array = np.sort(array)
-    # Index per array element:
-    index = np.arange(1, array.shape[0]+1)
-    # Number of array elements:
-    n = array.shape[0]
-    # Gini coefficient:
-    return ((np.sum((2 * index - n - 1) * array)) / (n * np.sum(array)))
-
 def plotMKR(output, blocks, mkr, mkrOld, mkrBoth, gini, giniP1, gini1):
     fig, ax1 = plt.subplots()
 
@@ -133,7 +103,7 @@ def historyMKR(output, mkrTransOld, mkrTrans, days=None, verbose=False, giniBoth
             if not balsCutoff.any():
                 empty = True
                 continue
-            g[i].append(gini(balsCutoff))
+            g[i].append(tokenHolders.gini(balsCutoff))
 
         if not empty:
             b.append(toBlock)

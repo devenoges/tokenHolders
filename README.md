@@ -21,6 +21,7 @@ pip3 install -r requirements.txt
 
 To produce the graphs above:
 ```
+$ export INFURA_API_KEY=<your-infura-api-key>
 $ ./tokenHolders.py -t 0x9f8f72aa9304c8b593d555f12ef6589cc3a579a2 > tx.MKR.json
 $ ./tokenHolders.py -t 0xC66eA802717bFb9833400264Dd12c2bCeAa34a6d > tx.MKR_OLD.json
 $ ./tokenGraphMKR.py -t tx.MKR.json -o tx.MKR_OLD.json MKR.png
