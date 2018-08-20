@@ -35,6 +35,9 @@ Example invocations:
 
 TODO:
     add csv output option
+    eg:
+Txhash	Blockno	UnixTimestamp	DateTime	From	To	Quantity
+0xb38301fecc96ba942229f82578420b85d6882dc7dbdcdf9d9f31ec226283cc95	4832688	1514764814	1/1/2018 12:00:14 AM	0xf73c3c65bde10bf26c2e1763104e609a41702efe	0x26e6fd6597965bed2875f08e8a7545c2389ba69d	13.8845
 """
 
 import argparse, os, sys
@@ -126,6 +129,41 @@ def getTransferEventLogs(address: str, decimals: int, fromBlock='earliest', toBl
         log['amount'] = Decimal(str(int(log['data'], 16))) * decimalFactor
     return logs
 
+def getTransferEventLogsCSV(address: str, decimals: int, fromBlock='earliest', toBlock='latest', chunkSize=50000):
+    """
+    TODO:
+        check block range step
+        write logs as they are receved
+        resume partial log download
+    """
+    firstLogBlock = 1
+    lastLogBlock = int(callInfura('eth_blockNumber', [{}])['result'], 16)
+    print(f'1st: {firstLogBlock} last: {lastLogBlock}', file=sys.stderr)
+    decimalFactor = Decimal('10') ** Decimal(f'-{decimals}')
+    for block in range(firstLogBlock, lastLogBlock, chunkSize):
+        attempts = 0
+        while attempts <= 3:
+            try:
+                logs = callInfura('eth_getLogs',
+                        [{'address': address, 'fromBlock': hex(block), 'toBlock': hex(block + chunkSize), 'topics': [ERC20_TRANSFER_EVENT_TOPIC_HASH]}])['result']
+                #logs += log
+                print(f'Processing {len(logs)} transfer events', file=sys.stderr)
+                for log in logs:
+                    log['from'] = '0x' + log['topics'][1][26:]
+                    log['to'] = '0x' + log['topics'][2][26:]
+                    log['amount'] = Decimal(str(int(log['data'], 16))) * decimalFactor
+                    #FIXME include datetime and timestamp
+                    print(f"{int(log['blockNumber'], 16)},{log['from']},{log['to']},{log['amount']:.{decimals}f}")
+                print(f'{len(logs)} logs for range {block} to {block + chunkSize}', file=sys.stderr)
+                break
+            except requests.exceptions.RequestException as ex:
+                attempts += 1
+                if attempts > 3:
+                    raise ex
+                else:
+                    print (f'Error getting logs from Infura {ex}, retrying', file=sys.stderr)
+
+
 def getBalances(transfers: list, toBlock=None, cutoff=None) -> list:
     """
     Assumes transfers are sorted by blockNumber.
@@ -155,13 +193,20 @@ if __name__ == '__main__':
             epilog='e.g. INFURA_API_KEY=<Your-Infura-Key> ./tokenHolders.py 0x9f8f72aa9304c8b593d555f12ef6589cc3a579a2 > MKR_bal.json')
     parser.add_argument('contract', help='ERC20 contract address', type=str)
     parser.add_argument('-d', '--decimals', help='ERC20 contract decimals (default 18)', default=18, type=int)
-    parser.add_argument('-c', '--chunk-size', help='Number of blocks per eth_getLogs request (default 50000)', default=50000, type=int)
+    parser.add_argument('-s', '--chunk-size', help='Number of blocks per eth_getLogs request (default 50000)', default=50000, type=int)
     parser.add_argument('-t', '--transfers', help='Print transfer events (default print address balances)', default=False, action='store_true')
+    parser.add_argument('-c', '--csv', help='Output CSV (default JSON)', default=False, action='store_true')
     arguments = parser.parse_args()
 
-    tx = getTransferEventLogs(arguments.contract, arguments.decimals, chunkSize=arguments.chunk_size)
     if arguments.transfers:
-        print(json.dumps(tx, indent=4))
+        if arguments.csv:
+            printTransferEventLogsCSV(arguments.contract, arguments.decimals, chunkSize=arguments.chunk_size)
+        else:
+            tx = getTransferEventLogs(arguments.contract, arguments.decimals, chunkSize=arguments.chunk_size)
+            print(json.dumps(tx, indent=4))
     else:
         balances = getBalances(tx)
-        print(json.dumps(balances, indent=4))
+        if arguments.csv:
+            print('\n'.join([f'{x},{y}' for x, y in balances.items()]))
+        else:
+            print(json.dumps(balances, indent=4))
